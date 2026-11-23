@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fund Data by Selected Date</title>
+    <!-- Material Design Lite CSS -->
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css" />
+    <!-- DateRangePicker CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    <!-- Google Fonts & Material Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <style>
+      /* Overall body styling */
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: #eceff1; /* Light grey background */
+        margin: 0;
+        padding: 0;
+      }
+      /* Main container (card) styling */
+      .container {
+        max-width: 900px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 30px 40px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+      /* Header styling */
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h2 {
+        margin: 0;
+        font-weight: 500;
+        color: #3f51b5;
+      }
+      .header p {
+        color: #757575;
+        font-size: 0.95em;
+        margin-top: 8px;
+      }
+      /* Form group spacing */
+      .form-group {
+        margin-bottom: 25px;
+      }
+      /* Text field full width */
+      .mdl-textfield {
+        width: 100%;
+      }
+      /* Error message styling */
+      .error {
+        display: none;
+        color: #f44336;
+        font-size: 0.9em;
+        margin-top: 5px;
+      }
+      /* Funds checkbox grid layout */
+      .checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        padding: 10px 0;
+      }
+      .checkbox-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background: #fafafa;
+        transition: background 0.3s, transform 0.3s;
+      }
+      .checkbox-item:hover {
+        background: #f5f5f5;
+        transform: translateY(-1px);
+      }
+      .checkbox-item input {
+        margin-right: 12px;
+      }
+      /* Email input styling */
+      .email-inputs .email-input {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .email-inputs .email-input input {
+        flex: 1;
+      }
+      /* Submit button centered */
+      .btn-submit {
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mdl-shadow--2dp">
+      <div class="header">
+        <h2>Generate Fund Details</h2>
+        <p>Select your date range, choose funds, and add your email addresses.</p>
+      </div>
+      <form id="emailForm">
+        <!-- Date Range Picker -->
+        <div class="form-group">
+          <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+            <input class="mdl-textfield__input" type="text" id="dateRange" name="dateRange" placeholder="" required />
+            <label class="mdl-textfield__label" for="dateRange">Date Range</label>
+          </div>
+          <div class="error" id="dateRangeError">Please select a valid date range.</div>
+        </div>
+
+        <!-- Fund Selection -->
+        <div class="form-group">
+          <p><strong>Select Funds:</strong></p>
+          <? if (typeof fundsList !== 'undefined' && fundsList.length > 0) { ?>
+            <div class="checkbox-grid">
+              <? for (var i = 0; i < fundsList.length; i++) { ?>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="fund<?= i ?>" name="funds" value="<?= fundsList[i] ?>" />
+                  <label for="fund<?= i ?>"><?= fundsList[i] ?></label>
+                </div>
+              <? } ?>
+            </div>
+          <? } else { ?>
+            <p>No funds available.</p>
+          <? } ?>
+        </div>
+
+        <!-- Email Inputs -->
+        <div class="form-group">
+          <p><strong>Enter Emails:</strong></p>
+          <div id="emailInputs" class="email-inputs">
+            <div class="email-input">
+              <input class="mdl-textfield__input" type="email" name="emails[]" placeholder="Enter email address" value="<?= defaultEmail ?>" required />
+              <button type="button" class="mdl-button mdl-js-button mdl-button--icon" onclick="addEmail()">
+                <i class="material-icons">add</i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="form-group">
+          <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored btn-submit" onclick="submitForm()">
+            Submit
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Include JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    <script>
+      // Initialize the DateRangePicker
+      $(function () {
+        $('#dateRange').daterangepicker({
+          opens: 'left',
+          autoUpdateInput: false,
+          locale: { cancelLabel: 'Clear' },
+          isInvalidDate: function (date) {
+            // Optionally disable weekends
+            return date.day() === 0 || date.day() === 6;
+          },
+          maxDate: moment()
+        });
+        $('#dateRange').on('apply.daterangepicker', function (ev, picker) {
+          const startDate = picker.startDate.format('YYYY-MM-DD');
+          const endDate = picker.endDate.format('YYYY-MM-DD');
+          $(this).val(`${startDate} - ${endDate}`);
+        });
+        $('#dateRange').on('cancel.daterangepicker', function () {
+          $(this).val('');
+        });
+      });
+
+      // Add Email Input Function
+      function addEmail() {
+        const emailInputs = document.getElementById('emailInputs');
+        const emailDiv = document.createElement('div');
+        emailDiv.classList.add('email-input');
+        emailDiv.innerHTML = `
+          <input class="mdl-textfield__input" type="email" name="emails[]" placeholder="Enter email address" required>
+          <button type="button" class="mdl-button mdl-js-button mdl-button--icon" onclick="addEmail()">
+            <i class="material-icons">add</i>
+          </button>
+          <button type="button" class="mdl-button mdl-js-button mdl-button--icon" onclick="removeEmail(this)">
+            <i class="material-icons">delete</i>
+          </button>
+        `;
+        emailInputs.appendChild(emailDiv);
+      }
+      function removeEmail(button) {
+        button.closest('.email-input').remove();
+      }
+
+      // On form submission, pass the data to the server-side function
+      function submitForm() {
+        const dateRange = document.getElementById('dateRange').value;
+        const dateRangeError = document.getElementById('dateRangeError');
+        if (!dateRange) {
+          dateRangeError.style.display = 'block';
+          return;
+        } else {
+          dateRangeError.style.display = 'none';
+        }
+        const form = document.getElementById('emailForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        data.funds = formData.getAll('funds');
+        data.emails = formData.getAll('emails[]');
+        
+        google.script.run.withSuccessHandler(function(response) {
+          alert(response.message);
+          console.log(response);
+        }).processSelectedDateData(data);
+      }
+    </script>
+  </body>
+</html>

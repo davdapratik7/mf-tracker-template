@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Roboto, Arial, sans-serif; font-size: 13px; color: #222; margin: 12px; }
+    label { display: block; font-weight: 600; margin: 10px 0 3px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .row { display: flex; gap: 8px; } .row > div { flex: 1; }
+    .hint { color: #64748b; font-size: 11px; margin-top: 3px; }
+    .chk { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-weight: 400; }
+    .chk input { width: auto; }
+    button { margin-top: 14px; width: 100%; padding: 10px; background: #0b1f3a; color: #fff; border: 0; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    button:disabled { background: #94a3b8; }
+    #msg { margin-top: 12px; padding: 8px; border-radius: 6px; display: none; white-space: pre-wrap; }
+    .ok { background: #dcfce7; color: #166534; } .err { background: #fee2e2; color: #991b1b; }
+    .red-only { display: none; } .buy-only { display: block; }
+    .disc { font-size: 10px; color: #94a3b8; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <label>Fund</label>
+  <select id="tab">
+    <? for (var i = 0; i < funds.length; i++) { ?>
+      <option value="<?= funds[i].tab ?>"><?= funds[i].label ?><?= funds[i].elss ? ' (ELSS)' : '' ?></option>
+    <? } ?>
+  </select>
+
+  <label>Type</label>
+  <select id="type">
+    <option value="SIP">SIP instalment</option>
+    <option value="Purchase">Lump-sum purchase</option>
+    <option value="Redemption">Redemption (sell)</option>
+  </select>
+
+  <label>Date (NAV date / allotment date)</label>
+  <input type="date" id="date">
+  <div class="hint" id="navHint"></div>
+
+  <div class="row">
+    <div><label>Amount ₹</label><input type="number" id="amount" step="0.01" min="0"></div>
+    <div><label>Units <span style="font-weight:400">(optional)</span></label><input type="number" id="units" step="0.001" min="0"></div>
+  </div>
+  <div class="hint buy-only">Leave units blank and they are computed from NAV, net of stamp duty. Copy units from your statement if you have them.</div>
+  <div class="hint red-only">Give units (most accurate) or amount, or tick "all units".</div>
+
+  <label>NAV <span style="font-weight:400">(optional, auto from AMFI)</span></label>
+  <input type="number" id="nav" step="0.0001" min="0">
+
+  <div class="buy-only">
+    <label>Folio <span style="font-weight:400">(optional)</span></label>
+    <input type="text" id="folio">
+    <label class="chk"><input type="checkbox" id="force"> Add anyway even if a same-amount entry exists ±3 days</label>
+  </div>
+  <div class="red-only">
+    <label class="chk"><input type="checkbox" id="all"> Redeem all redeemable units</label>
+  </div>
+
+  <button id="go" onclick="submitIt()">Save</button>
+  <div id="msg"></div>
+  <div class="disc">Rule-based tracker, not investment advice.</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  $('date').valueAsDate = new Date();
+  function toggle() {
+    const red = $('type').value === 'Redemption';
+    document.querySelectorAll('.red-only').forEach(e => e.style.display = red ? 'block' : 'none');
+    document.querySelectorAll('.buy-only').forEach(e => e.style.display = red ? 'none' : 'block');
+    preview();
+  }
+  function preview() {
+    if (!$('tab').value || !$('date').value) return;
+    $('navHint').textContent = 'Checking NAV…';
+    google.script.run.withSuccessHandler(p => {
+      if (!p) { $('navHint').textContent = ''; return; }
+      let t = p.nav ? 'NAV ' + p.nav + ' on ' + p.navDate : 'NAV for this date is not published yet';
+      if ($('type').value === 'Redemption') t += ' · Redeemable: ' + p.redeemable + ' units' + (p.elss ? ' (ELSS, 3-year lock-in applied)' : '');
+      $('navHint').textContent = t;
+    }).withFailureHandler(e => $('navHint').textContent = e.message).previewEntry($('tab').value, $('date').value);
+  }
+  ['tab', 'date'].forEach(id => $(id).addEventListener('change', preview));
+  $('type').addEventListener('change', toggle);
+  toggle();
+
+  function submitIt() {
+    const f = { tab: $('tab').value, type: $('type').value, date: $('date').value, amount: $('amount').value,
+                units: $('units').value, nav: $('nav').value, folio: $('folio').value, all: $('all').checked, force: $('force').checked };
+    $('go').disabled = true; show('Saving…', '');
+    google.script.run.withSuccessHandler(m => { $('go').disabled = false; show(m, m.indexOf('✅') === 0 ? 'ok' : 'err');
+        if (m.indexOf('✅') === 0) { $('amount').value = ''; $('units').value = ''; $('nav').value = ''; $('force').checked = false; preview(); } })
+      .withFailureHandler(e => { $('go').disabled = false; show(e.message, 'err'); })
+      .submitEntry(f);
+  }
+  function show(t, c) { const m = $('msg'); m.style.display = 'block'; m.className = c; m.textContent = t; }
+</script>
+</body>
+</html>

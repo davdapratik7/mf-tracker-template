@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <!-- Include Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .container {
+      padding: 20px;
+      max-width: 400px;
+      margin: auto;
+    }
+    .form-label {
+      font-weight: bold;
+    }
+    .btn-submit {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+    .btn-submit:hover {
+      background-color: #45a049;
+    }
+    /* Loader styling */
+    .loader {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #4CAF50;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+      display: none; /* Hidden by default */
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loader-text {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      margin-bottom: 20px;
+      display: none; /* Hidden by default */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <form id="monthForm">
+      <div class="mb-3">
+        <label for="monthRange" class="form-label">Select Month:</label>
+        <select id="monthRange" name="startDate" class="form-control" required>
+          <!-- Options will be populated dynamically -->
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Enter Email Address:</label>
+        <input type="email" id="email" name="email" class="form-control" required value="<?= defaultEmail ?>">
+      </div>
+      <button type="submit" class="btn btn-submit w-100">Send Monthly Report</button>
+    </form>
+    <!-- Loader -->
+    <div class="loader-text" id="loaderText">Processing your request...</div>
+    <div class="loader" id="loader"></div>
+  </div>
+
+  <!-- Include Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Client-Side JavaScript -->
+  <script>
+    // Populate the month ranges dynamically
+    google.script.run.withSuccessHandler(function(months) {
+
+    if (months.length === 0) {
+      alert('No available months found. Please try again later.');
+      return;
+    }
+    
+    const select = document.getElementById('monthRange');
+    const defaultOption = document.createElement('option');
+    defaultOption.textContent = '-- Select a Month --';
+    defaultOption.value = '';
+    select.appendChild(defaultOption);
+
+      months.forEach(month => {
+        const option = document.createElement('option');
+        option.value = month.value; // Use 'YYYY-MM-DD' format for value
+        option.textContent = month.display; // Use 'MMMM yyyy' format for display
+        select.appendChild(option);
+      });
+    }).withFailureHandler(function(error) {
+      alert('Failed to load months: ' + error.message);
+    }).getAvailableMonthRanges();
+
+    // Handle form submission
+    document.getElementById('monthForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      // Show the loader
+      document.getElementById('loader').style.display = 'block';
+      document.getElementById('loaderText').style.display = 'block';
+
+      // Disable the submit button to prevent multiple submissions
+      const submitButton = document.querySelector('.btn-submit');
+      submitButton.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          // Hide the loader
+          document.getElementById('loader').style.display = 'none';
+          document.getElementById('loaderText').style.display = 'none';
+
+          // Re-enable the submit button
+          submitButton.disabled = false;
+
+          if (response.success) {
+            alert('Report sent successfully: ' + response.message);
+          } else {
+            alert('Failed to send report: ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          // Hide the loader
+          document.getElementById('loader').style.display = 'none';
+          document.getElementById('loaderText').style.display = 'none';
+
+          // Re-enable the submit button
+          submitButton.disabled = false;
+
+          alert('An error occurred: ' + error.message);
+        })
+        .sendMonthlyNAVSummary(this);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Roboto, Arial, sans-serif; font-size: 13px; color: #222; margin: 6px 12px; }
+    textarea { width: 100%; height: 260px; font-family: monospace; font-size: 11px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }
+    select { padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
+    .bar { display: flex; gap: 16px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+    button { padding: 9px 18px; background: #0b1f3a; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #94a3b8; }
+    .hint { color: #475569; font-size: 12px; line-height: 1.5; }
+    code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; }
+    #msg { margin-top: 8px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="hint">
+    Paste a CSV with a header line. Works with <b>casparser</b> output of your CAMS / KFintech CAS
+    (<code>pip install casparser</code> → <code>casparser CAS.pdf -p PASSWORD -o cas.csv</code>, done on your own PC, so the
+    password never leaves it), or any export with columns like <code>date, scheme, amfi, folio, amount, units, nav, type</code>.
+    Tax rows (stamp duty, STT) and dividend payouts are ignored.
+  </div>
+  <div class="bar">
+    <label>Owner: <select id="owner">
+      <? for (var i = 0; i < owners.length; i++) { ?><option><?= owners[i] ?></option><? } ?>
+    </select></label>
+    <label><input type="checkbox" id="autoAdd" checked> Auto-add funds that are not in the Funds tab</label>
+    <label><input type="checkbox" id="process" checked> Process immediately</label>
+  </div>
+  <textarea id="csv" placeholder="date,scheme,amfi,folio,amount,units,nav,type&#10;2024-01-05,Axis Small Cap Fund - Regular Growth,125350,123456/78,2000,18.269,109.47,PURCHASE_SIP"></textarea>
+  <div class="bar"><button id="go" onclick="go()">Import</button><span id="msg"></span></div>
+<script>
+  function go() {
+    const b = document.getElementById('go'), m = document.getElementById('msg');
+    b.disabled = true; m.textContent = 'Working… (large CAS files can take a few minutes)';
+    google.script.run.withSuccessHandler(t => { b.disabled = false; m.textContent = '✅ ' + t; })
+      .withFailureHandler(e => { b.disabled = false; m.textContent = '❌ ' + e.message; })
+      .importCsvText(document.getElementById('csv').value,
+        { owner: document.getElementById('owner').value, autoAdd: document.getElementById('autoAdd').checked, process: document.getElementById('process').checked });
+  }
+</script>
+</body>
+</html>

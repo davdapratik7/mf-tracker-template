@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <!-- Include Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .container {
+      padding: 20px;
+      max-width: 400px;
+      margin: auto;
+    }
+    .form-label {
+      font-weight: bold;
+    }
+    .btn-submit {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+    .btn-submit:hover {
+      background-color: #45a049;
+    }
+    /* Loader styling */
+    .loader {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #4CAF50;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+      display: none; /* Hidden by default */
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loader-text {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      margin-bottom: 20px;
+      display: none; /* Hidden by default */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <form id="weekForm">
+      <div class="mb-3">
+        <label for="weekRange" class="form-label">Select Week Range:</label>
+        <select id="weekRange" name="startDate" class="form-control" required>
+          <!-- Options will be populated dynamically -->
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Enter Email Address:</label>
+        <input type="email" id="email" name="email" class="form-control" required value="<?= defaultEmail ?>">
+      </div>
+      <button type="submit" class="btn btn-submit w-100">Send Report</button>
+    </form>
+    <!-- Loader -->
+    <div class="loader-text" id="loaderText">Processing your request...</div>
+    <div class="loader" id="loader"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <!-- Success Toast -->
+    <div id="successToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body" id="successToastBody">
+          <!-- Success message will be injected here -->
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+    <!-- Error Toast -->
+    <div id="errorToast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body" id="errorToastBody">
+          <!-- Error message will be injected here -->
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Include Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Client-Side JavaScript -->
+  <script>
+    // Initialize Toast instances
+    const successToastEl = document.getElementById('successToast');
+    const errorToastEl = document.getElementById('errorToast');
+    const successToast = new bootstrap.Toast(successToastEl, { delay: 5000 });
+    const errorToast = new bootstrap.Toast(errorToastEl, { delay: 5000 });
+
+    // Populate the week ranges from the server-side function
+    google.script.run.withSuccessHandler(function(weeks) {
+      const select = document.getElementById('weekRange');
+      weeks.forEach(week => {
+        const option = document.createElement('option');
+        option.value = week.split(' to ')[0]; // Use the start date as value
+        option.textContent = week;
+        select.appendChild(option);
+      });
+    }).getAvailableWeekRanges();
+
+    // Handle form submission
+    document.getElementById('weekForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      // Show the loader
+      document.getElementById('loader').style.display = 'block';
+      document.getElementById('loaderText').style.display = 'block';
+
+      // Disable the submit button to prevent multiple submissions
+      const submitButton = document.querySelector('.btn-submit');
+      submitButton.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          // Hide the loader
+          document.getElementById('loader').style.display = 'none';
+          document.getElementById('loaderText').style.display = 'none';
+
+          // Re-enable the submit button
+          submitButton.disabled = false;
+
+          if (response.success) {
+            // Set the success message
+            document.getElementById('successToastBody').textContent = response.message;
+            // Show the success toast
+            successToast.show();
+          } else {
+            // Set the error message
+            document.getElementById('errorToastBody').textContent = 'Failed: ' + response.message;
+            // Show the error toast
+            errorToast.show();
+          }
+          // Optionally close the dialog if this HTML is opened as a dialog
+          // google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          // Hide the loader
+          document.getElementById('loader').style.display = 'none';
+          document.getElementById('loaderText').style.display = 'none';
+
+          // Re-enable the submit button
+          submitButton.disabled = false;
+
+          // Set the error message
+          document.getElementById('errorToastBody').textContent = 'An error occurred: ' + error.message;
+          // Show the error toast
+          errorToast.show();
+        })
+        .sendWeeklyNAVSummary1(this);
+    });
+  </script>
+</body>
+</html>

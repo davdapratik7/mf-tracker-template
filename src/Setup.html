@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Roboto, Arial, sans-serif; font-size: 13px; color: #1f2937; margin: 0; }
+  .steps { display: flex; gap: 4px; padding: 10px 16px; background: #0b1f3a; }
+  .steps div { flex: 1; text-align: center; color: #94a3b8; font-size: 12px; padding: 6px 0; border-bottom: 3px solid transparent; }
+  .steps div.on { color: #fff; border-color: #60a5fa; font-weight: 600; }
+  .steps div.done { color: #cbd5e1; }
+  .page { display: none; padding: 16px 22px; height: 520px; overflow-y: auto; }
+  .page.on { display: block; }
+  h2 { margin: 0 0 6px; font-size: 18px; } p.sub { margin: 0 0 14px; color: #64748b; }
+  label { font-weight: 600; display: block; margin: 10px 0 3px; }
+  input[type=text], input[type=email], input[type=number], select { width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { text-align: left; font-size: 12px; color: #475569; background: #f1f5f9; padding: 6px; }
+  td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+  td input, td select { padding: 5px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 14px; }
+  .btn { padding: 8px 16px; border: 0; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .pri { background: #0b1f3a; color: #fff; } .sec { background: #e2e8f0; color: #1f2937; } .dan { background: transparent; color: #b91c1c; padding: 4px 8px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .foot { display: flex; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #e5e7eb; background: #f8fafc; }
+  .disc { background: #fff7ed; border: 1px solid #fdba74; color: #7c2d12; padding: 12px; border-radius: 8px; line-height: 1.5; }
+  .results { max-height: 180px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 6px; }
+  .results div { padding: 6px 8px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+  .results div:hover { background: #eff6ff; }
+  .muted { color: #64748b; font-size: 12px; }
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #e0e7ff; color: #3730a3; font-size: 11px; }
+  .sum { font-weight: 700; } .sum.bad { color: #b91c1c; } .sum.good { color: #047857; }
+  #status { padding: 10px; border-radius: 6px; margin-top: 12px; display: none; white-space: pre-wrap; }
+  .ok { background: #dcfce7; color: #166534; } .err { background: #fee2e2; color: #991b1b; }
+  .chk { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+  .chk input { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="steps" id="steps"></div>
+
+<!-- 1. Welcome -->
+<div class="page" data-title="Welcome">
+  <h2>👋 Welcome to MF Portfolio Tracker</h2>
+  <p class="sub">This wizard sets up your sheet in about 5 minutes. You can run it again any time from the 📈 MF Tracker menu.</p>
+  <div class="disc" id="discText"></div>
+  <label class="chk"><input type="checkbox" id="accept"> I understand this is a calculator, not investment advice, and I will check the numbers against my own statements.</label>
+  <p class="muted" style="margin-top:14px">What the tracker does: one tab per fund with lot-wise purchases, FIFO redemptions, ELSS 3-year lock-in, STCG/LTCG split,
+    daily NAV from AMFI, owner-wise dashboard and projection, weekly/monthly report mails, and a rule-based Advisor (allocation vs target, overlap, dip top-ups).</p>
+  <p class="muted">Privacy: your data stays in this Google Sheet in your own account. The script only calls mfapi.in for NAVs (no personal data is sent) and,
+    if you enable it, reads your own Gmail for transaction mails.</p>
+</div>
+
+<!-- 2. Profile -->
+<div class="page" data-title="Profile">
+  <h2>👤 Profile & emails</h2>
+  <p class="sub">Used in report headers and as mail recipients.</p>
+  <label>Your name</label><input type="text" id="USER_NAME" placeholder="e.g. Asha Sharma">
+  <label>Alert email (errors, test mails)</label><input type="email" id="ALERT_EMAIL">
+  <label>Report recipients (comma-separated)</label><input type="text" id="REPORT_EMAILS">
+  <div class="grid3">
+    <div><label>Weekly report (Sat)</label><select id="WEEKLY_REPORT"><option>Yes</option><option>No</option></select></div>
+    <div><label>Monthly report (1st)</label><select id="MONTHLY_REPORT"><option>Yes</option><option>No</option></select></div>
+    <div><label>Weekly NAV log mail</label><select id="WEEKLY_NAV_LOG"><option>No</option><option>Yes</option></select></div>
+  </div>
+</div>
+
+<!-- 3. Owners -->
+<div class="page" data-title="Owners">
+  <h2>👨‍👩‍👧 Owners</h2>
+  <p class="sub">Whose money is tracked? Add family members if you manage their funds too. Each owner gets a separate total in the dashboard.</p>
+  <table><thead><tr><th style="width:28%">Name</th><th>Holder name as printed on mails / CAS <span class="muted">(optional, needed for Gmail auto-entry)</span></th><th style="width:16%">Birth year <span class="muted">(optional)</span></th><th style="width:40px"></th></tr></thead>
+    <tbody id="ownerRows"></tbody></table>
+  <button class="btn sec" style="margin-top:8px" onclick="addOwner()">+ Add owner</button>
+  <p class="muted">Birth year is only used for the "100 − age" equity thumb-rule in the Advisor. Leave it blank to skip.</p>
+</div>
+
+<!-- 4. Funds -->
+<div class="page" data-title="Funds">
+  <h2>🔍 Your funds</h2>
+  <p class="sub">Search by fund name and pick the exact plan (Direct/Regular, Growth). The AMFI scheme code is filled in for you.
+    Skip this step if you will import a CAS later (📥 Import can create fund tabs automatically).</p>
+  <input type="text" id="q" placeholder="Type at least 3 letters, e.g. parag flexi direct">
+  <div class="results" id="results" style="display:none"></div>
+  <table><thead><tr><th>Fund</th><th style="width:15%">Owner</th><th style="width:17%">Category</th><th style="width:7%">ELSS</th><th style="width:40px"></th></tr></thead>
+    <tbody id="fundRows"></tbody></table>
+  <p class="muted" id="fundCount"></p>
+</div>
+
+<!-- 5. Rules -->
+<div class="page" data-title="Goals & rules">
+  <h2>🎯 Target allocation & Advisor rules</h2>
+  <p class="sub">Pick a preset or type your own split. Leave all targets blank if you only want tracking. These are YOUR rules; the Advisor only applies them.</p>
+  <div class="grid2">
+    <div><label>Preset</label><select id="preset" onchange="applyPreset()"><option value="">Custom</option></select></div>
+    <div><label>Total <span id="sum" class="sum"></span></label><div class="muted">Must be 100% (or all blank).</div></div>
+  </div>
+  <div class="grid3" id="targets"></div>
+  <div class="grid3">
+    <div><label>Monthly top-up budget ₹</label><input type="number" id="TOPUP_BUDGET"></div>
+    <div><label>Top-up when NAV falls % from 52W high</label><input type="number" id="MILD_DD"></div>
+    <div><label>Strong top-up at fall %</label><input type="number" id="STRONG_DD"></div>
+    <div><label>Expected yearly return % (projection)</label><input type="number" id="EXPECTED_RETURN" step="0.5"></div>
+    <div><label>Goal corpus ₹</label><input type="number" id="GOAL_AMOUNT"></div>
+    <div><label>Advisor view</label><select id="ADVISOR_GROUPING"><option>Combined</option><option>Separate</option></select></div>
+  </div>
+</div>
+
+<!-- 6. Gmail + build -->
+<div class="page" data-title="Auto-entry & build">
+  <h2>📧 Gmail auto-entry (optional)</h2>
+  <p class="sub">If your investment platform sends a mail for every SIP/redemption, the tracker can add it for you every night.
+    Built-in parsers: <span id="parserList"></span>. Others: use ➕ Add transaction or 📥 Import, or add a parser (see docs/GMAIL_PARSERS.md).</p>
+  <div id="parserChecks"></div>
+  <div class="grid2">
+    <div><label>Only mails after (yyyy/mm/dd)</label><input type="text" id="GMAIL_START_DATE" placeholder="2026/01/01"></div>
+    <div><label>Bank credit alert search (optional)</label><input type="text" id="PAYOUT_QUERY" placeholder='from:alerts@mybank.com "MF REDEMPTION"'></div>
+  </div>
+  <p class="muted">Set the start date to the day after your last manually entered transaction so nothing gets added twice.</p>
+  <h2 style="margin-top:18px">🚀 Build</h2>
+  <p class="sub">Creates the fund tabs, Master Data dashboard, Advisor, logs and the daily trigger (7 AM: NAV update + scheduled mails).
+    Google will ask for permissions the first time; see the install guide for what each one is used for.</p>
+  <div id="review" class="muted"></div>
+  <button class="btn pri" id="build" onclick="build()">Build my tracker</button>
+  <div id="status"></div>
+</div>
+
+<div class="foot">
+  <button class="btn sec" id="back" onclick="go(-1)">← Back</button>
+  <button class="btn pri" id="next" onclick="go(1)">Next →</button>
+</div>
+
+<script>
+let S = null, step = 0;
+const pages = [...document.querySelectorAll('.page')];
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+google.script.run.withSuccessHandler(init).withFailureHandler(e => alert(e.message)).getSetupState();
+
+function init(state) {
+  S = state;
+  $('steps').innerHTML = pages.map(p => '<div>' + p.dataset.title + '</div>').join('');
+  $('discText').textContent = S.disclaimer;
+  ['USER_NAME', 'ALERT_EMAIL', 'REPORT_EMAILS', 'WEEKLY_REPORT', 'MONTHLY_REPORT', 'WEEKLY_NAV_LOG', 'TOPUP_BUDGET', 'MILD_DD', 'STRONG_DD',
+   'EXPECTED_RETURN', 'GOAL_AMOUNT', 'ADVISOR_GROUPING', 'GMAIL_START_DATE', 'PAYOUT_QUERY'].forEach(k => { if ($(k)) $(k).value = S.settings[k]; });
+  if (!S.owners.length) S.owners = [{ name: S.settings.USER_NAME || '', holder: '', birthYear: '' }];
+  renderOwners();
+  // targets
+  $('targets').innerHTML = S.categories.map(c => '<div><label>' + esc(c) + ' %</label><input type="number" class="tg" data-cat="' + esc(c) + '" min="0" max="100" value="' + (S.targets[c] || '') + '"></div>').join('');
+  document.querySelectorAll('.tg').forEach(i => i.addEventListener('input', () => { $('preset').value = ''; sumTargets(); }));
+  Object.keys(S.presets).forEach(p => { const o = document.createElement('option'); o.textContent = p; $('preset').appendChild(o); });
+  sumTargets();
+  // parsers
+  const on = String(S.settings.GMAIL_PARSERS || '').toUpperCase().split(',').map(s => s.trim());
+  $('parserList').textContent = S.parsers.join(', ');
+  $('parserChecks').innerHTML = S.parsers.map(p => '<label class="chk"><input type="checkbox" class="parser" value="' + p + '"' + (on.indexOf(p) >= 0 ? ' checked' : '') + '> Enable ' + p + ' mails</label>').join('');
+  renderFunds();
+  show(0);
+}
+
+function show(i) {
+  step = i;
+  pages.forEach((p, k) => p.classList.toggle('on', k === i));
+  [...$('steps').children].forEach((d, k) => { d.className = k === i ? 'on' : k < i ? 'done' : ''; });
+  $('back').disabled = i === 0;
+  $('next').style.visibility = i === pages.length - 1 ? 'hidden' : 'visible';
+  if (i === 3) renderFunds();
+  if (i === pages.length - 1) review();
+}
+
+function go(d) {
+  const err = checkStep(step);
+  if (d > 0 && err) return alert(err);
+  show(Math.max(0, Math.min(pages.length - 1, step + d)));
+}
+
+function checkStep(i) {
+  if (i === 0 && !$('accept').checked) return 'Please tick the disclaimer box to continue.';
+  if (i === 1 && $('ALERT_EMAIL').value.indexOf('@') < 0) return 'Enter a valid alert email.';
+  if (i === 2) { readOwners(); if (!S.owners.length || S.owners.some(o => !o.name)) return 'Every owner needs a name.'; }
+  if (i === 4) { const s = sumTargets(); if (s && Math.abs(s - 100) > 0.5) return 'Targets add up to ' + s + '%. Make it 100% or leave all blank.'; }
+  return '';
+}
+
+// ---------- owners ----------
+function renderOwners() {
+  $('ownerRows').innerHTML = S.owners.map((o, i) =>
+    '<tr><td><input type="text" class="own-n" value="' + esc(o.name) + '" placeholder="Name"></td>' +
+    '<td><input type="text" class="own-h" value="' + esc(o.holder) + '" placeholder="e.g. ASHA R SHARMA"></td>' +
+    '<td><input type="number" class="own-b" value="' + esc(o.birthYear) + '" placeholder="1990"></td>' +
+    '<td>' + (S.owners.length > 1 ? '<button class="btn dan" onclick="delOwner(' + i + ')">✕</button>' : '') + '</td></tr>').join('');
+}
+function readOwners() {
+  const n = [...document.querySelectorAll('.own-n')], h = [...document.querySelectorAll('.own-h')], b = [...document.querySelectorAll('.own-b')];
+  S.owners = n.map((x, i) => ({ name: x.value.trim(), holder: h[i].value.trim().toUpperCase(), birthYear: b[i].value }));
+}
+function addOwner() { readOwners(); S.owners.push({ name: '', holder: '', birthYear: '' }); renderOwners(); }
+function delOwner(i) {
+  readOwners();
+  if (S.funds.some(f => f.existing && f.owner === S.owners[i].name)) return alert('This owner already has fund tabs. Mark those funds inactive instead.');
+  S.owners.splice(i, 1); renderOwners(); renderFunds();
+}
+
+// ---------- funds ----------
+let timer = null;
+$('q').addEventListener('input', () => {
+  clearTimeout(timer);
+  const q = $('q').value.trim();
+  if (q.length < 3) { $('results').style.display = 'none'; return; }
+  timer = setTimeout(() => {
+    $('results').style.display = 'block'; $('results').innerHTML = '<div class="muted">Searching…</div>';
+    google.script.run.withSuccessHandler(list => {
+      $('results').innerHTML = list.length ? list.map(x => '<div data-code="' + x.code + '">' + esc(x.name) + ' <span class="pill">' + x.code + '</span></div>').join('')
+        : '<div class="muted">No match. Try fewer words.</div>';
+      [...$('results').children].forEach(d => d.dataset.code && d.addEventListener('click', () => pickFund(d.dataset.code)));
+    }).withFailureHandler(e => { $('results').innerHTML = '<div class="muted">' + esc(e.message) + '</div>'; }).searchSchemes(q);
+  }, 400);
+});
+
+function pickFund(code) {
+  readOwners();
+  $('results').innerHTML = '<div class="muted">Loading scheme details…</div>';
+  google.script.run.withSuccessHandler(info => {
+    S.funds.push({ code: info.code, name: info.name, owner: S.owners[0].name, cat: info.cat, elss: info.elss, amc: info.amc, match: info.match,
+                   nav: info.nav, navDate: info.navDate, house: info.house, growth: info.growth });
+    $('results').style.display = 'none'; $('q').value = '';
+    renderFunds();
+  }).withFailureHandler(e => alert(e.message)).getSchemeInfo(code);
+}
+
+function renderFunds() {
+  readOwnersSafe();
+  S.funds.forEach(f => { if (S.owners.length && !S.owners.some(o => o.name === f.owner)) f.owner = S.owners[0].name; });
+  const ownerOpts = sel => S.owners.map(o => '<option' + (o.name === sel ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('');
+  const catOpts = sel => S.categories.map(c => '<option' + (c === sel ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+  $('fundRows').innerHTML = S.funds.map((f, i) =>
+    '<tr><td>' + esc(f.name) + '<br><span class="muted">' + f.code + (f.existing ? ' · existing tab' + (f.active === false ? ' · inactive' : '') : ' · NAV ' + f.nav + ' (' + f.navDate + ')') +
+      (f.growth === false ? ' · ⚠️ IDCW plan' : '') + '</span></td>' +
+    '<td><select data-i="' + i + '" class="fo">' + ownerOpts(f.owner) + '</select></td>' +
+    '<td><select data-i="' + i + '" class="fc">' + catOpts(f.cat) + '</select></td>' +
+    '<td style="text-align:center"><input type="checkbox" data-i="' + i + '" class="fe"' + (f.elss ? ' checked' : '') + '></td>' +
+    '<td>' + (f.existing ? '<button class="btn dan" title="Keep data, stop updating" onclick="toggleActive(' + i + ')">' + (f.active === false ? '↺' : '⏸') + '</button>'
+                         : '<button class="btn dan" onclick="delFund(' + i + ')">✕</button>') + '</td></tr>').join('');
+  document.querySelectorAll('.fo').forEach(e => e.onchange = () => { S.funds[e.dataset.i].owner = e.value; });
+  document.querySelectorAll('.fc').forEach(e => e.onchange = () => { S.funds[e.dataset.i].cat = e.value; });
+  document.querySelectorAll('.fe').forEach(e => e.onchange = () => { S.funds[e.dataset.i].elss = e.checked; });
+  $('fundCount').textContent = S.funds.length + ' fund(s) selected.';
+}
+function readOwnersSafe() { if (document.querySelectorAll('.own-n').length) readOwners(); }
+function delFund(i) { S.funds.splice(i, 1); renderFunds(); }
+function toggleActive(i) { S.funds[i].active = S.funds[i].active === false; renderFunds(); }
+
+// ---------- targets ----------
+function applyPreset() {
+  const p = S.presets[$('preset').value];
+  if (!p) return;
+  document.querySelectorAll('.tg').forEach(i => { i.value = p[i.dataset.cat] || ''; });
+  sumTargets();
+}
+function readTargets() { const t = {}; document.querySelectorAll('.tg').forEach(i => { if (+i.value > 0) t[i.dataset.cat] = +i.value; }); return t; }
+function sumTargets() {
+  const t = readTargets(), s = Object.keys(t).reduce((a, k) => a + t[k], 0);
+  $('sum').textContent = s ? s + '%' : '(blank)';
+  $('sum').className = 'sum ' + (!s || Math.abs(s - 100) < 0.5 ? 'good' : 'bad');
+  return s;
+}
+
+// ---------- build ----------
+function payload() {
+  const settings = {};
+  ['USER_NAME', 'ALERT_EMAIL', 'REPORT_EMAILS', 'WEEKLY_REPORT', 'MONTHLY_REPORT', 'WEEKLY_NAV_LOG', 'TOPUP_BUDGET', 'MILD_DD', 'STRONG_DD',
+   'EXPECTED_RETURN', 'GOAL_AMOUNT', 'ADVISOR_GROUPING', 'GMAIL_START_DATE', 'PAYOUT_QUERY'].forEach(k => { settings[k] = $(k).value.trim(); });
+  settings.GMAIL_PARSERS = [...document.querySelectorAll('.parser:checked')].map(x => x.value).join(',');
+  return { settings: settings, targets: readTargets(), owners: S.owners, funds: S.funds, disclaimerAccepted: $('accept').checked };
+}
+function review() {
+  readOwnersSafe();
+  const p = payload();
+  $('review').innerHTML = '<b>' + p.owners.length + '</b> owner(s): ' + p.owners.map(o => esc(o.name)).join(', ') +
+    ' · <b>' + p.funds.length + '</b> fund(s) · targets: ' + (Object.keys(p.targets).length ? Object.keys(p.targets).map(k => esc(k) + ' ' + p.targets[k] + '%').join(', ') : 'none') +
+    ' · Gmail parsers: ' + (p.settings.GMAIL_PARSERS || 'off') + '<br><br>';
+}
+function build() {
+  if (!$('accept').checked) { show(0); return alert('Please accept the disclaimer first.'); }
+  $('build').disabled = true; status('Building… this can take a minute or two for many funds.', '');
+  google.script.run.withSuccessHandler(m => { status(m + '\n\nYou can close this window now.', 'ok'); })
+    .withFailureHandler(e => { $('build').disabled = false; status('❌ ' + e.message, 'err'); })
+    .saveSetup(payload());
+}
+function status(t, c) { const s = $('status'); s.style.display = 'block'; s.className = c; s.textContent = t; }
+</script>
+</body>
+</html>
